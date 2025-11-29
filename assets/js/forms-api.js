@@ -6,13 +6,9 @@ var _conditionalElements = _interopRequireDefault(require("./forms/conditional-e
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "default": obj }; }
 
 var nl4wp = window.nl4wp || {};
-
 var Gator = require('gator');
-
 var forms = require('./forms/forms.js');
-
 var config = window.nl4wp_forms_config || {};
-
 var scrollToElement = require('scroll-to-element');
 
 // funcs
@@ -25,21 +21,21 @@ function scrollToForm(form) {
 }
 
 function handleFormRequest(form, eventName, errors, data) {
+    // Questa funzione gestiva il reload sincrono.
+    // La lasciamo per compatibilità con il codice "submitted_form" in fondo,
+    // ma per AJAX useremo una logica dedicata nel listener.
   var timeStart = Date.now();
-  var pageHeight = document.body.clientHeight; // re-populate form
+  var pageHeight = document.body.clientHeight; 
 
   if (errors) {
     form.setData(data);
-  } // scroll to form
-
+  }
 
   if (window.scrollY <= 10 && config.auto_scroll) {
     scrollToForm(form);
-  } // trigger events on window.load so all other scripts have loaded
+  }
 
-
-  window.addEventListener('load', function () {
-    // trigger events
+  // trigger events
     forms.trigger(form.id + '.submitted', [form]);
     forms.trigger('submitted', [form]);
 
@@ -47,41 +43,118 @@ function handleFormRequest(form, eventName, errors, data) {
       forms.trigger(form.id + '.error', [form, errors]);
       forms.trigger('error', [form, errors]);
     } else {
-      // form was successfully submitted
       forms.trigger(form.id + '.success', [form, data]);
-      forms.trigger('success', [form, data]); // subscribed / unsubscribed
-
+      forms.trigger('success', [form, data]);
       forms.trigger(form.id + "." + eventName, [form, data]);
-      forms.trigger(eventName, [form, data]); // for BC: always trigger "subscribed" event when firing "updated_subscriber" event
+      forms.trigger(eventName, [form, data]); 
 
       if (eventName === 'updated_subscriber') {
         forms.trigger(form.id + "." + "subscribed", [form, data, true]);
         forms.trigger('subscribed', [form, data, true]);
       }
-    } // scroll to form again if page height changed since last scroll, eg because of slow loading images
-    // (only if load didn't take more than 0.8 seconds to prevent overtaking user scroll)
-
+    }
 
     var timeElapsed = Date.now() - timeStart;
-
     if (config.auto_scroll && timeElapsed > 1000 && timeElapsed < 2000 && document.body.clientHeight !== pageHeight) {
       scrollToForm(form);
     }
-  });
-} // Bind browser events to form events (using delegation)
+} 
 
-
+// *** NUOVO HANDLER AJAX ***
 Gator(document.body).on('submit', '.nl4wp-form', function (event) {
   var form = forms.getByElement(event.target || event.srcElement);
+  
+  // 1. Notifichiamo gli eventi interni (es. per attivare reCAPTCHA)
+  // NON chiamiamo ancora preventDefault() qui.
+  forms.trigger(form.id + '.submit', [form, event]);
+  forms.trigger('submit', [form, event]);
 
-  if (!event.defaultPrevented) {
-    forms.trigger(form.id + '.submit', [form, event]);
+  // 2. CONTROLLO ESTERNO:
+  // Se un plugin (es. il listener di reCAPTCHA in class-google-recaptcha.php) 
+  // ha chiamato event.preventDefault(), significa che sta lavorando (es. caricando token).
+  // Noi ci fermiamo e non facciamo nulla. Quando reCAPTCHA avrà finito, rilancerà il submit 
+  // e al secondo passaggio questo check sarà falso.
+  if (event.defaultPrevented) {
+      return; 
   }
 
-  if (!event.defaultPrevented) {
-    forms.trigger('submit', [form, event]);
+  // 3. ORA BLOCCHIAMO IL RELOAD
+  // Se siamo arrivati qui, reCAPTCHA non sta bloccando l'invio (o ha già finito),
+  // quindi tocca a noi bloccare il refresh della pagina per usare AJAX.
+  event.preventDefault();
+
+  // --- LOGICA AJAX ---
+  
+  // Reset UI
+  form.setResponse(''); 
+  var formEl = form.element;
+  formEl.classList.add('nl4wp-form-loading');
+  var submitBtn = formEl.querySelector('input[type="submit"], button[type="submit"]');
+  if(submitBtn) submitBtn.disabled = true;
+
+  // Preparazione Dati
+  var formData = new FormData(formEl);
+  formData.append('action', 'nl4wp_submit_form');
+  
+  // Recupero Configurazione
+  var config = window.nl4wp_forms_config || {};
+  var ajaxUrl = config.ajax_url || '/wp-admin/admin-ajax.php';
+  
+  if(config.nonce) {
+      formData.append('nonce', config.nonce);
   }
+
+  // Chiamata Fetch
+  fetch(ajaxUrl, {
+      method: 'POST',
+      body: formData
+  })
+  .then(function(response) { return response.json(); })
+  .then(function(response) {
+      // Pulizia UI
+      formEl.classList.remove('nl4wp-form-loading');
+      if(submitBtn) submitBtn.disabled = false;
+
+      if (response.success) {
+          var data = response.data;
+          form.element.reset();
+          
+          // Rimuovi vecchio token recaptcha
+          var token = formEl.querySelector('input[name="_nl4wp_grecaptcha_token"]');
+          if(token) token.parentNode.removeChild(token);
+
+          form.setResponse('<div class="nl4wp-success">' + data.message + '</div>');
+          
+          forms.trigger(form.id + '.success', [form, data]);
+          forms.trigger('success', [form, data]);
+
+          if (data.redirect_url) {
+              window.location.href = data.redirect_url;
+          }
+      } else {
+          var data = response.data || {};
+          var errorMsg = data.message || 'Si è verificato un errore.';
+          if(data.errors && Array.isArray(data.errors)) {
+              errorMsg = data.errors.join('<br>');
+          }
+          form.setResponse('<div class="nl4wp-error">' + errorMsg + '</div>');
+          forms.trigger(form.id + '.error', [form, data]);
+          forms.trigger('error', [form, data]);
+      }
+      
+      if (config.auto_scroll) {
+          scrollToForm(form);
+      }
+  })
+  .catch(function(err) {
+      console.error(err);
+      formEl.classList.remove('nl4wp-form-loading');
+      if(submitBtn) submitBtn.disabled = false;
+      form.setResponse('<div class="nl4wp-error">Errore di connessione.</div>');
+  });
 });
+// *** FINE NUOVO HANDLER ***
+
 Gator(document.body).on('focus', '.nl4wp-form', function (event) {
   var form = forms.getByElement(event.target || event.srcElement);
 
@@ -91,36 +164,31 @@ Gator(document.body).on('focus', '.nl4wp-form', function (event) {
     form.started = true;
   }
 });
+
 Gator(document.body).on('change', '.nl4wp-form', function (event) {
   var form = forms.getByElement(event.target || event.srcElement);
   forms.trigger('change', [form, event]);
   forms.trigger(form.id + '.change', [form, event]);
-}); // init conditional elements
+}); 
 
-_conditionalElements["default"].init(); // register early listeners
-
+_conditionalElements["default"].init(); 
 
 if (nl4wp.listeners) {
   var listeners = nl4wp.listeners;
-
   for (var i = 0; i < listeners.length; i++) {
     forms.on(listeners[i].event, listeners[i].callback);
-  } // delete temp listeners array, so we don't bind twice
-
-
+  } 
   delete nl4wp["listeners"];
-} // expose forms object
+} 
 
-
-nl4wp.forms = forms; // handle submitted form
+nl4wp.forms = forms; 
 
 if (config.submitted_form) {
   var formConfig = config.submitted_form,
       element = document.getElementById(formConfig.element_id),
       form = forms.getByElement(element);
   handleFormRequest(form, formConfig.event, formConfig.errors, formConfig.data);
-} // expose nl4wp object globally
-
+} 
 
 window.nl4wp = nl4wp;
 
@@ -2358,3 +2426,4 @@ module.exports = Tween;
 
 },{}]},{},[1]);
  })();
+

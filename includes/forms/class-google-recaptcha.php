@@ -46,36 +46,42 @@ class NL4WP_Google_Recaptcha {
         return $data;
     }
 
-    public function load_script() {
+	public function load_script() {
+		
         $global_settings = nl4wp_get_settings();
 
-        // do not load if no forms with Google reCAPTCHA enabled were outputted
         if (empty($this->form_ids) || empty($global_settings['grecaptcha_site_key']) || empty($global_settings['grecaptcha_secret_key'])) {
             return;
         }
 
-        // load Google reCAPTCHA script
         echo sprintf('<script src="https://www.google.com/recaptcha/api.js?render=%s"></script>', esc_attr($global_settings['grecaptcha_site_key']));
 
-        // hook into form submit
         ?><script>
             (function() {
                 var formIds = <?php echo json_encode($this->form_ids); ?>;
 
                 function addGoogleReCaptchaTokenToForm(form, event) {
+                    // MODIFICA PER AJAX: 
+                    // Se il token esiste già, significa che reCAPTCHA ha finito il suo lavoro.
+                    // Ritorniamo immediatamente per lasciare che il gestore AJAX (forms-api.js) prosegua.
+                    var previousToken = form.element.querySelector('input[name=_nl4wp_grecaptcha_token]');
+                    if (previousToken && previousToken.value) {
+                        return; 
+                    }
+
+                    // Se non c'è il token, fermiamo tutto e aspettiamo Google
                     event.preventDefault();
 
                     var submitForm = function() {
-                        if(form.element.className.indexOf('nl4wp-ajax') > -1) {
-                            nl4wp.forms.trigger('submit', [form, event]);
+                        // Rieseguiamo il submit nativo del DOM. 
+                        // Poiché ora il token esiste (vedi sopra), questa funzione non bloccherà più l'evento
+                        // e il listener in forms-api.js potrà intercettarlo per fare la chiamata AJAX.
+                        if (typeof form.element.requestSubmit === 'function') {
+                            form.element.requestSubmit();
                         } else {
-                            form.element.submit();
+                            form.element.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));
                         }
                     };
-                    var previousToken = form.element.querySelector('input[name=_nl4wp_grecaptcha_token]');
-                    if (previousToken) {
-                        previousToken.parentElement.removeChild(previousToken);
-                    }
 
                     window.grecaptcha
                         .execute('<?php echo esc_attr($global_settings['grecaptcha_site_key']); ?>', {action: 'nl4wp_form_submit'})
@@ -86,16 +92,17 @@ class NL4WP_Google_Recaptcha {
                             tokenEl.name = '_nl4wp_grecaptcha_token';
                             form.element.appendChild(tokenEl);
                             submitForm();
-                        })
+                        });
                 }
 
                 for(var i=0; i<formIds.length; i++) {
+                    // Usiamo .submit (evento interno) che viene triggerato dal nostro forms-api.js
                     nl4wp.forms.on(formIds[i]+'.submit', addGoogleReCaptchaTokenToForm)
                 }
             })();
         </script><?php
     }
-
+	
     public function on_output_form(NL4WP_Form $form) {
         // Check if form has Google ReCaptcha enabled
         if (!$form->settings['grecaptcha_enabled']) {

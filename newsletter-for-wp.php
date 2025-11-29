@@ -1,18 +1,18 @@
 <?php
 /*
-Plugin Name: Newsletter for WordPress
-Plugin URI: https://github.com/mailrouter/Newsletter-for-Wordpress/
+Plugin Name: Newsletter for WordPress (AJAX edition)
+Plugin URI: https://github.com/BotheorY/wp-newsletter-ajax/
 Description: Newsletter for WordPress by mailrouter. Aggiunge vari metodi di iscrizione newsletter al tuo sito.
-Version: 4.5.12
-Author: mailrouter
-Text Domain: newsletter-for-wp
+Version: 4.6.0
+Author: Andrea Barbagallo
+Text Domain: wp-newsletter-ajax
 Domain Path: /languages
 License: GPL v3
 
-Newsletter for WordPress
-Copyright (C) 2024, Void Labs snc, info@voidlabs.it
+Newsletter for WordPress (AJAX edition)
+Copyright (C) 2025, Andrea Barbagallo, info@andreabarbagallo.com
 forked from
-Mailchimp for WordPress
+Newsletter for WordPress
 Copyright (C) 2012-2024, Danny van Kooten, hi@dannyvankooten.com
 
 integrates
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 /* PLUGIN AUTOUPDATE */
 require 'plugin-update-checker/plugin-update-checker.php';
 $myUpdateChecker = YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
-	'https://github.com/mailrouter/Newsletter-for-Wordpress/',
+	'https://github.com/BotheorY/wp-newsletter-ajax/',
 	__FILE__,
 	'newsletter-for-wp'
 );

@@ -1,8 +1,8 @@
-=== Newsletter for WordPress ===
-Contributors: Morloi, Bago
+=== Newsletter for WordPress (AJAX edition) ===
+Contributors: Morloi, Bago, Andrea Barbagallo (BotheorY)
 Tags: newsletter, nl4wp, email, marketing, newsletter, subscribe, widget, nl4wp, contact form 7, woocommerce, buddypress, newsletter forms, newsletter integrations
 Requires at least: 4.1
-Tested up to: 6.5.2
+Tested up to: 6.8.3
 Stable tag: 4.5.12
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -115,6 +115,13 @@ Per ogni questione relativa al plugin e al suo funzionamento, fate riferimento a
 
 Changelog
 =========
+
+#### 4.6.0 - Nov 29, 2025
+
+**Improvements**
+
+- Use AJAX to send modules.
+
 
 #### 4.5.12 - May 27, 2024
 

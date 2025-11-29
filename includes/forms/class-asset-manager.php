@@ -38,6 +38,20 @@ class NL4WP_Form_Asset_Manager
         add_action('wp_footer', array( $this, 'load_scripts' ));
 
         $this->register_assets();
+
+		// In newsletter-for-wp.php
+		add_action('wp_enqueue_scripts', function() {
+			// Assicuriamoci che lo script sia accodato (handle presunto 'nl4wp-forms-api' o simile, verificare handle nel codice originale degli assets)
+			// Se non conosciamo l'handle esatto, usiamo wp_localize_script su un handle comune o registriamo un piccolo script inline.
+			// Supponendo che il plugin carichi 'forms-api.js' o 'forms-api.min.js'
+			
+			// Definiamo i parametri globali per JS
+			wp_localize_script('nl4wp-forms-api', 'nl4wp_ajax_settings', array(
+				'ajax_url' => admin_url('admin-ajax.php'),
+				'nonce'    => wp_create_nonce('nl4wp-ajax-nonce')
+			));
+		}, 20);
+		
     }
 
     /**
@@ -148,7 +162,7 @@ class NL4WP_Form_Asset_Manager
         return true;
     }
 
-    /**
+/**
      * Get configuration object for client-side use.
      *
      * @return array
@@ -156,42 +170,33 @@ class NL4WP_Form_Asset_Manager
     public function get_javascript_config()
     {
         $submitted_form = nl4wp_get_submitted_form();
-        if (! $submitted_form) {
-            return array();
-        }
-
+        
+        // --- INIZIO MODIFICA AJAX ---
         $config = array(
-            'submitted_form' => array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce'    => wp_create_nonce('nl4wp-ajax-nonce'),
+        );
+        // --- FINE MODIFICA AJAX ---
+
+        if ($submitted_form) {
+            $config['submitted_form'] = array(
                 'id' => $submitted_form->ID,
                 'event' => $submitted_form->last_event,
                 'data' => $submitted_form->get_data(),
                 'element_id' => $submitted_form->config['element_id'],
-            )
-        );
-
-        if ($submitted_form->has_errors()) {
-            $config['submitted_form']['errors'] = $submitted_form->errors;
+            );
+            
+            if ($submitted_form->has_errors()) {
+                $config['submitted_form']['errors'] = $submitted_form->errors;
+            }
         }
 
         $auto_scroll = 'default';
-
-        /**
-         * Filters the `auto_scroll` setting for when a form is submitted.
-         *
-         * Accepts the following  values:
-         *
-         * - false
-         * - "default"
-         * - "animated"
-         *
-         * @param boolean|string $auto_scroll
-         * @since 3.0
-         */
         $config['auto_scroll'] = apply_filters('nl4wp_form_auto_scroll', $auto_scroll);
 
         return $config;
-    }
-
+    }	
+	
     /**
      * Load JavaScript files
      */

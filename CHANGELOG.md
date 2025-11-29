@@ -1,6 +1,13 @@
 Changelog
 =========
 
+#### 4.6.0 - Nov 29, 2025
+
+**Improvements**
+
+- Use AJAX to send modules.
+
+
 #### 4.5.12 - May 27, 2024
 
 **Improvements**
