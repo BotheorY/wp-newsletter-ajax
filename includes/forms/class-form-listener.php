@@ -72,7 +72,7 @@ class NL4WP_Form_Listener
             }
         }
 
-        // Prepara la risposta
+        // Prepare response payload for frontend
         $response_data = array(
             'form_id' => $form->ID,
             'errors'  => array(),
@@ -91,7 +91,7 @@ class NL4WP_Form_Listener
             wp_send_json_error($response_data);
 
         } else {
-            // Successo
+            // Success
             // Determina quale messaggio mostrare in base all'evento scatenato
             if ($form->last_event === 'updated_subscriber') {
                 $response_data['message'] = $form->messages['updated'];
@@ -106,6 +106,9 @@ class NL4WP_Form_Listener
             if (!empty($redirect_url)) {
                 $response_data['redirect_url'] = $redirect_url;
             }
+
+            // Include hide-after-success setting so frontend can remove the form when enabled
+            $response_data['hide_after_success'] = (int) (!empty($form->settings['hide_after_success']) ? $form->settings['hide_after_success'] : 0);
 
             // Hook successo
             do_action('nl4wp_form_success', $form);

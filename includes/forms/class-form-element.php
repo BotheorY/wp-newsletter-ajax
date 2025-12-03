@@ -271,6 +271,8 @@ class NL4WP_Form_Element
         $attributes['method'] = 'post';
         $attributes['data-id'] = $this->form->ID;
         $attributes['data-name'] = $this->form->name;
+        //*+ Added attribute to expose hide-after-success behavior to frontend JavaScript
+        $attributes['data-hide-after-success'] = $this->form->settings['hide_after_success'] ? '1' : '0';
 
         // build string of key="value" from array
         $string = '';

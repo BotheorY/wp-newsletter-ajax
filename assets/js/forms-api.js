@@ -109,7 +109,17 @@ Gator(document.body).on('submit', '.nl4wp-form', function (event) {
       method: 'POST',
       body: formData
   })
-  .then(function(response) { return response.json(); })
+  // Robust response handling: validate HTTP status and JSON
+  .then(function(response) {
+      if (!response.ok) {
+          return response.text().then(function(text){
+              throw new Error('Request failed: ' + response.status + ' ' + response.statusText + (text ? (' - ' + text) : ''));
+          });
+      }
+      return response.json().catch(function(){
+          throw new Error('Invalid JSON in AJAX response');
+      });
+  })
   .then(function(response) {
       // Pulizia UI
       formEl.classList.remove('nl4wp-form-loading');
@@ -122,8 +132,29 @@ Gator(document.body).on('submit', '.nl4wp-form', function (event) {
           // Rimuovi vecchio token recaptcha
           var token = formEl.querySelector('input[name="_nl4wp_grecaptcha_token"]');
           if(token) token.parentNode.removeChild(token);
+          // Determine hide-after-success setting (prefer server-provided value)
+          var hideAfterSuccess = (typeof data.hide_after_success !== 'undefined')
+              ? !!data.hide_after_success
+              : (formEl.getAttribute('data-hide-after-success') === '1');
 
-          form.setResponse('<div class="nl4wp-success">' + data.message + '</div>');
+          // Build success message HTML consistent with PHP renderer
+          var successHtml = '<div class="nl4wp-alert nl4wp-success"><p>' + data.message + '</p></div>';
+
+          if (hideAfterSuccess) {
+              // Replace the entire form with the confirmation message at the same position
+              var placeholder = document.createElement('div');
+              placeholder.className = 'nl4wp-response';
+              placeholder.innerHTML = successHtml;
+              // Replace form in DOM
+              if (formEl.parentNode) {
+                  formEl.parentNode.replaceChild(placeholder, formEl);
+              }
+              // Optional: update form.element reference to the placeholder for downstream listeners
+              form.element = placeholder;
+          } else {
+              // Maintain existing behavior: show message below the form
+              form.setResponse(successHtml);
+          }
           
           forms.trigger(form.id + '.success', [form, data]);
           forms.trigger('success', [form, data]);
@@ -133,24 +164,31 @@ Gator(document.body).on('submit', '.nl4wp-form', function (event) {
           }
       } else {
           var data = response.data || {};
-          var errorMsg = data.message || 'Si è verificato un errore.';
+          var errorMsg = data.message || 'An error occurred. Please check your input.';
           if(data.errors && Array.isArray(data.errors)) {
               errorMsg = data.errors.join('<br>');
           }
-          form.setResponse('<div class="nl4wp-error">' + errorMsg + '</div>');
+          var errorHtml = '<div class="nl4wp-alert nl4wp-error"><p>' + errorMsg + '</p></div>';
+          form.setResponse(errorHtml);
           forms.trigger(form.id + '.error', [form, data]);
           forms.trigger('error', [form, data]);
       }
       
       if (config.auto_scroll) {
-          scrollToForm(form);
+          // Scroll to response; when form was replaced, scroll to the new placeholder
+          var target = form.element;
+          scrollToElement(target, {
+              duration: config.auto_scroll === 'animated' ? 800 : 1,
+              alignment: 'middle'
+          });
       }
   })
   .catch(function(err) {
+      // Log error and restore UI state
       console.error(err);
       formEl.classList.remove('nl4wp-form-loading');
       if(submitBtn) submitBtn.disabled = false;
-      form.setResponse('<div class="nl4wp-error">Errore di connessione.</div>');
+      form.setResponse('<div class="nl4wp-alert nl4wp-error"><p>Connection error. Please try again later.</p></div>');
   });
 });
 // *** FINE NUOVO HANDLER ***
