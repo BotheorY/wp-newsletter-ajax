@@ -1,5 +1,7 @@
 <?php
 
+//require_once dirname(dirname(__DIR__)) . '/utils.php';
+
 /**
  * Class NL4WP_Form_Listener
  *
@@ -33,6 +35,13 @@ class NL4WP_Form_Listener
         if (empty($_POST['_nl4wp_form_id'])) {
             wp_send_json_error(array('message' => 'Form ID mancante.'));
         }
+
+/*        
+        $nonce_is_valid = isset($_POST['_nl4wp_nonce']) && wp_verify_nonce($_POST['_nl4wp_nonce'], 'nl4wp_submit_form');
+        if (! $nonce_is_valid) {
+            $this->get_log()->warning(sprintf('Form %s > nonce mancante o non valido', isset($_POST['_nl4wp_form_id']) ? $_POST['_nl4wp_form_id'] : 'n/a'));
+        }
+*/
 
         try {
             $form_id = (int) $_POST['_nl4wp_form_id'];
@@ -223,6 +232,7 @@ class NL4WP_Form_Listener
 
             // send a subscribe request to Newsletter for each list
             $result = $newsletter->list_subscribe($list_id, $subscriber->email_address, $subscriber->to_array(), $form->settings['update_existing'], $form->settings['replace_interests']);
+
         }
 
         $log = $this->get_log();
